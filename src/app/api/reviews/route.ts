@@ -11,19 +11,33 @@ export async function POST(req: Request) {
   }
 
   const db = getDb()
-  const today = new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  const nowIso = now.toISOString()
+  const today = nowIso.slice(0, 10)
   const quality = responseTimeToQuality(responseTimeMs)
 
   const existing = db.prepare(`
-    SELECT ease_factor, repetitions, interval_days
+    SELECT ease_factor, repetitions, interval_days, next_review
     FROM chord_progress WHERE user_id = ? AND chord_id = ?
-  `).get(userId, chordId) as { ease_factor: number; repetitions: number; interval_days: number } | undefined
+  `).get(userId, chordId) as { ease_factor: number; repetitions: number; interval_days: number; next_review: string } | undefined
 
   const state = existing
     ? { easeFactor: existing.ease_factor, repetitions: existing.repetitions, intervalDays: existing.interval_days }
     : DEFAULT_SM2_STATE
 
   const result = updateSM2(state, quality)
+
+  // Failed cards requeue 20 minutes from now (sub-day ISO datetime).
+  // Never move the next_review earlier than it already is — if the card is already
+  // scheduled further in the future, keep that later date.
+  let nextReview: string
+  if (quality < 3) {
+    const requeue = new Date(now.getTime() + 5 * 60 * 1000).toISOString()
+    const existingFuture = existing?.next_review && existing.next_review > nowIso ? existing.next_review : null
+    nextReview = existingFuture && existingFuture > requeue ? existingFuture : requeue
+  } else {
+    nextReview = result.nextReview
+  }
 
   db.transaction(() => {
     db.prepare(`
@@ -35,26 +49,27 @@ export async function POST(req: Request) {
         interval_days = excluded.interval_days,
         next_review = excluded.next_review,
         last_review = excluded.last_review
-    `).run(userId, chordId, result.easeFactor, result.repetitions, result.intervalDays, result.nextReview, today)
+    `).run(userId, chordId, result.easeFactor, result.repetitions, result.intervalDays, nextReview, today)
 
     db.prepare(`
       INSERT INTO review_log (user_id, chord_id, response_time_ms, quality, reviewed_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run(userId, chordId, responseTimeMs, quality, new Date().toISOString())
+    `).run(userId, chordId, responseTimeMs, quality, nowIso)
   })()
 
-  // Failed cards come back immediately; successes advance to next due card
-  let nextChord = quality < 3 ? CHORD_BY_ID.get(chordId) : undefined
+  // Always serve a different chord next. Only fall back to the same chord if
+  // there are truly no other options (e.g. all 144 reviewed and only this one exists).
+  let nextChord: ReturnType<typeof CHORD_BY_ID.get>
 
-  if (!nextChord) {
-    const dueRow = db.prepare(`
-      SELECT chord_id FROM chord_progress
-      WHERE user_id = ? AND next_review <= ? AND chord_id != ?
-      ORDER BY next_review ASC LIMIT 1
-    `).get(userId, today, chordId) as { chord_id: string } | undefined
-    if (dueRow) nextChord = CHORD_BY_ID.get(dueRow.chord_id)
-  }
+  // 1. Another chord already due
+  const dueRow = db.prepare(`
+    SELECT chord_id FROM chord_progress
+    WHERE user_id = ? AND next_review <= ? AND chord_id != ?
+    ORDER BY next_review ASC LIMIT 1
+  `).get(userId, nowIso, chordId) as { chord_id: string } | undefined
+  if (dueRow) nextChord = CHORD_BY_ID.get(dueRow.chord_id)
 
+  // 2. New unseen chord
   if (!nextChord) {
     const seenIds = (db.prepare(`
       SELECT chord_id FROM chord_progress WHERE user_id = ?
@@ -63,6 +78,17 @@ export async function POST(req: Request) {
     nextChord = ALL_CHORDS.find(c => !seenSet.has(c.id))
   }
 
+  // 3. Study ahead — earliest upcoming chord that isn't this one
+  if (!nextChord) {
+    const aheadRow = db.prepare(`
+      SELECT chord_id FROM chord_progress
+      WHERE user_id = ? AND chord_id != ?
+      ORDER BY next_review ASC LIMIT 1
+    `).get(userId, chordId) as { chord_id: string } | undefined
+    if (aheadRow) nextChord = CHORD_BY_ID.get(aheadRow.chord_id)
+  }
+
+  // 4. Last resort: only this chord exists in the deck
   if (!nextChord) {
     const aheadRow = db.prepare(`
       SELECT chord_id FROM chord_progress

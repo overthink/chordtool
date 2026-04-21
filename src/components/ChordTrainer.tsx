@@ -30,11 +30,7 @@ export function ChordTrainer({ chordId, symbol, imageUrl, heldNotes, onChordPlay
   const readyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const markReady = useCallback(() => {
-    setReady(prev => {
-      if (prev) return prev
-      startTimeRef.current = Date.now()
-      return true
-    })
+    setReady(prev => prev || true)
     if (readyTimerRef.current) clearTimeout(readyTimerRef.current)
   }, [])
 

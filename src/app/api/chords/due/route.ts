@@ -7,15 +7,15 @@ export function GET(req: NextRequest) {
   if (!Number.isFinite(userId) || userId <= 0) return NextResponse.json({ error: 'userId required' }, { status: 400 })
 
   const db = getDb()
-  const today = new Date().toISOString().slice(0, 10)
+  const nowIso = new Date().toISOString()
 
-  // First: chords due today (already reviewed at least once)
+  // First: chords due now (already reviewed at least once)
   const dueRow = db.prepare(`
     SELECT chord_id FROM chord_progress
     WHERE user_id = ? AND next_review <= ?
     ORDER BY next_review ASC
     LIMIT 1
-  `).get(userId, today) as { chord_id: string } | undefined
+  `).get(userId, nowIso) as { chord_id: string } | undefined
 
   if (dueRow) {
     const chord = CHORD_BY_ID.get(dueRow.chord_id)!
