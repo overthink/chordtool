@@ -24,7 +24,7 @@ export function ChordDisplay({ chordId, symbol, showHint, timeoutSeconds }: Prop
 
   return (
     <div className="flex flex-col items-center gap-6">
-      <div className="text-9xl font-bold tracking-tight select-none">{symbol}</div>
+      <div className="text-6xl sm:text-9xl font-bold tracking-tight select-none">{symbol}</div>
       <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all ${showHint ? 'bg-red-400' : 'bg-blue-500'}`}
