@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Header } from './Header'
 import { ChordTrainer } from './ChordTrainer'
 import { HeldNotes } from './HeldNotes'
@@ -18,14 +18,22 @@ export function TrainingSession({ userId, username, onSwitchProfile }: Props) {
   const [showStats, setShowStats] = useState(false)
   const { status, inputs, selectedInputId, setSelectedInputId, heldNotes, playChord } = useMidi()
   const { currentChord, cardKey, error, fetchNextChord, recordReview } = useSRS()
+  // Prevents duplicate review submissions from React StrictMode double-mounting,
+  // which resets ChordTrainer's hasMatchedRef and can re-fire onChordPlayed.
+  const reviewInProgressRef = useRef(false)
 
   useEffect(() => {
     fetchNextChord(userId)
   }, [userId, fetchNextChord])
 
   const handleChordPlayed = useCallback(async (responseTimeMs: number) => {
-    if (!currentChord) return
-    await recordReview(userId, currentChord.chordId, responseTimeMs)
+    if (!currentChord || reviewInProgressRef.current) return
+    reviewInProgressRef.current = true
+    try {
+      await recordReview(userId, currentChord.chordId, responseTimeMs)
+    } finally {
+      reviewInProgressRef.current = false
+    }
   }, [currentChord, userId, recordReview])
 
   return (

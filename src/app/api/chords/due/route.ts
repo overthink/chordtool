@@ -34,10 +34,12 @@ export function GET(req: NextRequest) {
     return NextResponse.json({ chordId: newChord.id, symbol: newChord.symbol, imageUrl: newChord.imageUrl })
   }
 
-  // Third: all reviewed, none due — return earliest next_review (study ahead)
+  // Third: all reviewed, none due — study ahead on properly-scheduled cards only.
+  // Exclude sub-day ISO requeue timestamps (failed cards) so they don't jump the
+  // queue ahead of their 5-minute window.
   const aheadRow = db.prepare(`
     SELECT chord_id FROM chord_progress
-    WHERE user_id = ?
+    WHERE user_id = ? AND next_review >= date('now', '+1 day')
     ORDER BY next_review ASC
     LIMIT 1
   `).get(userId) as { chord_id: string } | undefined

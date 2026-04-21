@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
   const result = updateSM2(state, quality)
 
-  // Failed cards requeue 20 minutes from now (sub-day ISO datetime).
+  // Failed cards requeue 5 minutes from now (sub-day ISO datetime).
   // Never move the next_review earlier than it already is — if the card is already
   // scheduled further in the future, keep that later date.
   let nextReview: string
@@ -78,21 +78,24 @@ export async function POST(req: Request) {
     nextChord = ALL_CHORDS.find(c => !seenSet.has(c.id))
   }
 
-  // 3. Study ahead — earliest upcoming chord that isn't this one
+  // 3. Study ahead — earliest properly-scheduled chord (due tomorrow or later).
+  // Deliberately excludes failed/requeued cards whose next_review is a sub-day
+  // ISO timestamp (e.g. "2026-04-21T02:40:05Z"); those sort before date-only
+  // strings like "2026-04-22" and would otherwise bypass the 5-minute requeue.
   if (!nextChord) {
     const aheadRow = db.prepare(`
       SELECT chord_id FROM chord_progress
-      WHERE user_id = ? AND chord_id != ?
+      WHERE user_id = ? AND chord_id != ? AND next_review >= date('now', '+1 day')
       ORDER BY next_review ASC LIMIT 1
     `).get(userId, chordId) as { chord_id: string } | undefined
     if (aheadRow) nextChord = CHORD_BY_ID.get(aheadRow.chord_id)
   }
 
-  // 4. Last resort: only this chord exists in the deck
+  // 4. Last resort: deck has only one chord (or all cards are in requeue window)
   if (!nextChord) {
     const aheadRow = db.prepare(`
       SELECT chord_id FROM chord_progress
-      WHERE user_id = ?
+      WHERE user_id = ? AND next_review >= date('now', '+1 day')
       ORDER BY next_review ASC LIMIT 1
     `).get(userId) as { chord_id: string } | undefined
     if (aheadRow) nextChord = CHORD_BY_ID.get(aheadRow.chord_id)

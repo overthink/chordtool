@@ -6,14 +6,15 @@ const DB_PATH = path.join(process.cwd(), 'data', 'chordtool.db')
 
 let _db: Database.Database | null = null
 
-function initSchema(db: Database.Database) {
-  db.exec(`
+const TABLES: Record<string, string> = {
+  users: `
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
       created_at TEXT NOT NULL
-    );
-
+    ) STRICT
+  `,
+  chord_progress: `
     CREATE TABLE IF NOT EXISTS chord_progress (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -24,8 +25,9 @@ function initSchema(db: Database.Database) {
       next_review TEXT NOT NULL,
       last_review TEXT,
       UNIQUE(user_id, chord_id)
-    );
-
+    ) STRICT
+  `,
+  review_log: `
     CREATE TABLE IF NOT EXISTS review_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -33,8 +35,14 @@ function initSchema(db: Database.Database) {
       response_time_ms INTEGER NOT NULL,
       quality INTEGER NOT NULL,
       reviewed_at TEXT NOT NULL
-    );
-  `)
+    ) STRICT
+  `,
+}
+
+function setup(db: Database.Database) {
+  for (const ddl of Object.values(TABLES)) {
+    db.exec(ddl)
+  }
 }
 
 export function getDb(): Database.Database {
@@ -42,7 +50,7 @@ export function getDb(): Database.Database {
     fs.mkdirSync(path.dirname(DB_PATH), { recursive: true })
     _db = new Database(DB_PATH)
     _db.pragma('journal_mode = WAL')
-    initSchema(_db)
+    setup(_db)
   }
   return _db
 }
