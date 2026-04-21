@@ -16,5 +16,5 @@ export function App() {
     return <ProfileSelector onProfileSelected={(userId, username) => setProfile({ userId, username })} />
   }
 
-  return <TrainingSession userId={profile.userId} username={profile.username} />
+  return <TrainingSession userId={profile.userId} username={profile.username} onSwitchProfile={() => setProfile(null)} />
 }

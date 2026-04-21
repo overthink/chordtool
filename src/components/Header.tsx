@@ -11,9 +11,10 @@ interface Props {
   onSelectInput: (id: string) => void
   onToggleStats: () => void
   showStats: boolean
+  onSwitchProfile: () => void
 }
 
-export function Header({ username, midiStatus, inputs, selectedInputId, onSelectInput, onToggleStats, showStats }: Props) {
+export function Header({ username, midiStatus, inputs, selectedInputId, onSelectInput, onToggleStats, showStats, onSwitchProfile }: Props) {
   return (
     <header className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-white">
       <div className="flex items-center gap-3">
@@ -23,6 +24,12 @@ export function Header({ username, midiStatus, inputs, selectedInputId, onSelect
           className="text-sm text-blue-600 hover:underline"
         >
           {showStats ? 'Train' : 'Stats'}
+        </button>
+        <button
+          onClick={onSwitchProfile}
+          className="text-sm text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-400 rounded px-2 py-0.5 transition-colors"
+        >
+          Pause
         </button>
       </div>
 

@@ -11,9 +11,10 @@ import { useSRS } from '@/hooks/useSRS'
 interface Props {
   userId: number
   username: string
+  onSwitchProfile: () => void
 }
 
-export function TrainingSession({ userId, username }: Props) {
+export function TrainingSession({ userId, username, onSwitchProfile }: Props) {
   const [showStats, setShowStats] = useState(false)
   const { status, inputs, selectedInputId, setSelectedInputId, heldNotes, playChord } = useMidi()
   const { currentChord, cardKey, error, fetchNextChord, recordReview } = useSRS()
@@ -37,6 +38,7 @@ export function TrainingSession({ userId, username }: Props) {
         onSelectInput={setSelectedInputId}
         onToggleStats={() => setShowStats(s => !s)}
         showStats={showStats}
+        onSwitchProfile={onSwitchProfile}
       />
 
       {showStats ? (

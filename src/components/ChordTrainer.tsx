@@ -1,11 +1,14 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChordDisplay } from './ChordDisplay'
 import { ChordHint } from './ChordHint'
 import { CHORD_BY_ID } from '@/lib/chords'
 
 const HINT_TIMEOUT_MS = 10_000
+// How long after card load before match detection activates.
+// Prevents carried-over held notes from instantly matching the new chord.
+const READY_DELAY_MS = 500
 
 interface Props {
   chordId: string
@@ -18,30 +21,54 @@ interface Props {
 
 export function ChordTrainer({ chordId, symbol, imageUrl, heldNotes, onChordPlayed, playChord }: Props) {
   const [showHint, setShowHint] = useState(false)
+  // Using state (not ref) so that when the ready timer fires, it triggers a
+  // re-render and the match effect re-runs against the currently held notes.
+  const [ready, setReady] = useState(false)
   const startTimeRef = useRef<number>(Date.now())
   const hasMatchedRef = useRef(false)
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const readyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const markReady = useCallback(() => {
+    setReady(prev => {
+      if (prev) return prev
+      startTimeRef.current = Date.now()
+      return true
+    })
+    if (readyTimerRef.current) clearTimeout(readyTimerRef.current)
+  }, [])
 
   useEffect(() => {
-    startTimeRef.current = Date.now()
     hasMatchedRef.current = false
+    setReady(false)
+    startTimeRef.current = Date.now()
     setShowHint(false)
 
     if (hintTimerRef.current) clearTimeout(hintTimerRef.current)
     hintTimerRef.current = setTimeout(() => setShowHint(true), HINT_TIMEOUT_MS)
 
+    if (readyTimerRef.current) clearTimeout(readyTimerRef.current)
+    readyTimerRef.current = setTimeout(markReady, READY_DELAY_MS)
+
     return () => {
       if (hintTimerRef.current) clearTimeout(hintTimerRef.current)
+      if (readyTimerRef.current) clearTimeout(readyTimerRef.current)
     }
-  }, [chordId])
+  }, [chordId, markReady])
 
-  // Check for chord match on every heldNotes change.
-  // heldNotes contains raw MIDI note numbers; derive pitch classes before matching
-  // so that releasing one octave of a doubled note doesn't clear the pitch class.
+  // Become ready immediately when the user releases all keys (no need to wait
+  // for the full 500ms timer in the normal case).
   useEffect(() => {
-    if (hasMatchedRef.current) return
+    if (!ready && heldNotes.size === 0) markReady()
+  }, [heldNotes, ready, markReady])
+
+  // Check for chord match on every heldNotes or ready change.
+  // heldNotes stores raw MIDI note numbers; derive pitch classes before matching
+  // so releasing one octave of a doubled note doesn't clear the pitch class.
+  useEffect(() => {
+    if (hasMatchedRef.current || !ready || heldNotes.size === 0) return
     const chord = CHORD_BY_ID.get(chordId)
-    if (!chord || chord.pitchClasses.length === 0 || heldNotes.size === 0) return
+    if (!chord || chord.pitchClasses.length === 0) return
 
     const heldPitchClasses = new Set([...heldNotes].map(n => n % 12))
     const isMatch = chord.pitchClasses.every(pc => heldPitchClasses.has(pc))
@@ -49,7 +76,7 @@ export function ChordTrainer({ chordId, symbol, imageUrl, heldNotes, onChordPlay
       hasMatchedRef.current = true
       onChordPlayed(Date.now() - startTimeRef.current)
     }
-  }, [heldNotes, chordId, onChordPlayed])
+  }, [ready, heldNotes, chordId, onChordPlayed])
 
   const chord = CHORD_BY_ID.get(chordId)
 
@@ -64,7 +91,7 @@ export function ChordTrainer({ chordId, symbol, imageUrl, heldNotes, onChordPlay
           ▶ Play
         </button>
       )}
-      {showHint && <ChordHint chordId={chordId} imageUrl={imageUrl} />}
+      <ChordHint chordId={chordId} imageUrl={imageUrl} visible={showHint} />
     </div>
   )
 }
