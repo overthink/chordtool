@@ -13,9 +13,10 @@ interface Props {
   imageUrl: string
   heldNotes: Set<number>
   onChordPlayed: (responseTimeMs: number) => void
+  playChord: (pitchClasses: number[], durationMs?: number) => void
 }
 
-export function ChordTrainer({ chordId, symbol, imageUrl, heldNotes, onChordPlayed }: Props) {
+export function ChordTrainer({ chordId, symbol, imageUrl, heldNotes, onChordPlayed, playChord }: Props) {
   const [showHint, setShowHint] = useState(false)
   const startTimeRef = useRef<number>(Date.now())
   const hasMatchedRef = useRef(false)
@@ -50,9 +51,19 @@ export function ChordTrainer({ chordId, symbol, imageUrl, heldNotes, onChordPlay
     }
   }, [heldNotes, chordId, onChordPlayed])
 
+  const chord = CHORD_BY_ID.get(chordId)
+
   return (
     <div className="flex flex-col items-center py-12">
       <ChordDisplay chordId={chordId} symbol={symbol} showHint={showHint} timeoutSeconds={HINT_TIMEOUT_MS / 1000} />
+      {chord && (
+        <button
+          onClick={() => playChord(chord.pitchClasses)}
+          className="mt-6 px-4 py-2 text-sm text-gray-400 hover:text-gray-600 border border-gray-200 hover:border-gray-400 rounded-lg transition-colors"
+        >
+          ▶ Play
+        </button>
+      )}
       {showHint && <ChordHint chordId={chordId} imageUrl={imageUrl} />}
     </div>
   )

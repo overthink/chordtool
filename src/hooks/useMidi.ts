@@ -12,6 +12,7 @@ export interface UseMidiReturn {
   setSelectedInputId: (id: string) => void
   // Raw MIDI note numbers (0-127) currently held. Use % 12 for pitch class.
   heldNotes: Set<number>
+  playChord: (pitchClasses: number[], durationMs?: number) => void
 }
 
 type NoteHandlers = { noteon: (e: { note: { number: number } }) => void; noteoff: (e: { note: { number: number } }) => void }
@@ -124,5 +125,14 @@ export function useMidi(): UseMidiReturn {
     }
   }, [setSelectedInputId])
 
-  return { status, inputs, selectedInputId, setSelectedInputId, heldNotes }
+  const playChord = useCallback((pitchClasses: number[], durationMs = 1500) => {
+    if (!WebMidi.enabled || WebMidi.outputs.length === 0) return
+    const output = WebMidi.outputs[0]
+    // Map pitch classes to octave 4 (middle C = 60)
+    const notes = pitchClasses.map(pc => 60 + pc)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    output.playNote(notes, { duration: durationMs, attack: 65 / 127 } as any)
+  }, [])
+
+  return { status, inputs, selectedInputId, setSelectedInputId, heldNotes, playChord }
 }

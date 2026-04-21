@@ -15,7 +15,7 @@ interface Props {
 
 export function TrainingSession({ userId, username }: Props) {
   const [showStats, setShowStats] = useState(false)
-  const { status, inputs, selectedInputId, setSelectedInputId, heldNotes } = useMidi()
+  const { status, inputs, selectedInputId, setSelectedInputId, heldNotes, playChord } = useMidi()
   const { currentChord, cardKey, error, fetchNextChord, recordReview } = useSRS()
 
   useEffect(() => {
@@ -50,6 +50,7 @@ export function TrainingSession({ userId, username }: Props) {
             imageUrl={currentChord.imageUrl}
             heldNotes={heldNotes}
             onChordPlayed={handleChordPlayed}
+            playChord={playChord}
           />
         </main>
       ) : error ? (
