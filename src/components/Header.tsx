@@ -34,10 +34,10 @@ export function Header({ username, midiStatus, inputs, selectedInputId, onSelect
       </div>
 
       <div className="flex items-center gap-2">
-        {(midiStatus === 'denied' || midiStatus === 'unsupported') ? (
+        {(midiStatus === 'denied' || midiStatus === 'unsupported' || midiStatus === 'insecure') ? (
           <span className="flex items-center gap-1.5 text-sm text-red-600">
             <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
-            {midiStatus === 'denied' ? 'MIDI denied' : 'MIDI unsupported'}
+            {midiStatus === 'denied' ? 'MIDI denied' : midiStatus === 'insecure' ? 'MIDI needs HTTPS' : 'MIDI unsupported'}
           </span>
         ) : midiStatus === 'loading' ? (
           <span className="text-sm text-gray-400">Connecting MIDI…</span>

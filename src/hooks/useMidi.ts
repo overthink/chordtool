@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { WebMidi, Input } from 'webmidi'
 
-export type MidiStatus = 'loading' | 'enabled' | 'denied' | 'unsupported'
+export type MidiStatus = 'loading' | 'enabled' | 'denied' | 'insecure' | 'unsupported'
 
 export interface UseMidiReturn {
   status: MidiStatus
@@ -102,6 +102,8 @@ export function useMidi(): UseMidiReturn {
 
     if (WebMidi.enabled) {
       setup()
+    } else if (!window.isSecureContext) {
+      setStatus('insecure')
     } else {
       WebMidi.enable()
         .then(() => {
